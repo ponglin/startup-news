@@ -12,7 +12,7 @@ variable "project_id" {
 variable "region" {
   description = "GCP Region for resources"
   type        = string
-  default     = "asia-east1"
+  default     = "asia-northeast1"
   validation {
     condition     = can(regex("^[a-z]+-[a-z]+-[0-9]$", var.region))
     error_message = "Region must be a valid GCP region."
