@@ -39,8 +39,6 @@ resource "google_firestore_database" "startup_news" {
   location_id         = var.region
   type                = "FIRESTORE_NATIVE"
   concurrency_mode    = "OPTIMISTIC"
-  delete_protection_enabled = true
-
   depends_on = [google_project_service.required_apis]
 }
 
