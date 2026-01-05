@@ -1,0 +1,87 @@
+# Cloud Build Configuration for Startup News Platform
+# Automated deployment to GCP using Terraform
+
+steps:
+  # Step 1: Authenticate with GCP
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    id: 'auth-gcp'
+    args:
+      - run
+      - bash
+      - -c
+      - |
+        echo "Authenticating with GCP..."
+        gcloud auth list
+
+  # Step 2: Deploy Infrastructure with Terraform
+  - name: 'hashicorp/terraform:latest'
+    id: 'terraform-init'
+    args:
+      - init
+    dir: 'infra/terraform'
+    env:
+      - 'TF_VAR_project_id=${PROJECT_ID}'
+      - 'TF_VAR_region=${_GCP_REGION}'
+
+  # Step 3: Plan Terraform changes
+  - name: 'hashicorp/terraform:latest'
+    id: 'terraform-plan'
+    args:
+      - plan
+      - -out=tfplan
+    dir: 'infra/terraform'
+    env:
+      - 'TF_VAR_project_id=${PROJECT_ID}'
+      - 'TF_VAR_region=${_GCP_REGION}'
+
+  # Step 4: Apply Terraform changes
+  - name: 'hashicorp/terraform:latest'
+    id: 'terraform-apply'
+    args:
+      - apply
+      - tfplan
+    dir: 'infra/terraform'
+    env:
+      - 'TF_VAR_project_id=${PROJECT_ID}'
+      - 'TF_VAR_region=${_GCP_REGION}'
+
+  # Step 5: Build and push Cloud Functions
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'deploy-functions'
+    args:
+      - 'functions'
+      - 'deploy'
+      - 'aggregate-startup-news'
+      - '--runtime=python39'
+      - '--trigger-topic=startup-news-trigger'
+      - '--entry-point=main'
+      - '--source=functions/aggregate-news'
+      - '--project=${PROJECT_ID}'
+      - '--region=${_GCP_REGION}'
+      - '--set-env-vars=GEMINI_API_KEY=${_GEMINI_API_KEY},FIREBASE_PROJECT=${_FIREBASE_PROJECT}'
+
+  # Step 6: Deploy web application
+  - name: 'gcr.io/cloud-builders/firebase'
+    id: 'deploy-firebase'
+    args:
+      - 'deploy'
+      - '--project=${_FIREBASE_PROJECT}'
+      - '--only=hosting'
+      - '--token=${_FIREBASE_TOKEN}'
+
+substitutions:
+  _GCP_REGION: 'asia-east1'
+  _FIREBASE_PROJECT: '${PROJECT_ID}'
+  _GEMINI_API_KEY: ''
+  _FIREBASE_TOKEN: ''
+
+images:
+  - 'gcr.io/${PROJECT_ID}/startup-news:${BUILD_ID}'
+
+timeout: '3600s'
+
+options:
+  machineType: 'N1_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+logsBucket: 'gs://${PROJECT_ID}-cloud-build-logs'
