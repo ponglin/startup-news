@@ -13,11 +13,7 @@ variable "region" {
   description = "GCP Region for resources"
   type        = string
   default     = "asia-northeast1"
-  validation {
-    condition     = true
-    error_message  = "Region is validated by GCP Provider"
-  }
-}
+  
 
 variable "gemini_api_key" {
   description = "Google Gemini API Key for AI processing"
