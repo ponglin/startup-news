@@ -67,7 +67,7 @@ jobs:
 
       - name: Upload deployment summary
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: deployment-summary
           path: infra/terraform/deployment-outputs.json
