@@ -1,65 +1,58 @@
-name: Deploy Startup News Platform
+name: Deploy to Cloud Run
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: ${{ secrets.GCP_REGION }}
+  SERVICE_NAME: startup-news-aggregator
+  IMAGE_NAME: startup-news
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v2
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
         with:
-          terraform_version: 1.5.0
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Terraform Init
-        working-directory: ./infra/terraform
-        env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GCP_SA_KEY }}
-          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-          TF_VAR_region: ${{ secrets.GCP_REGION }}
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker authentication
         run: |
-          terraform init
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
-      - name: Terraform Plan
-        working-directory: ./infra/terraform
-        env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GCP_SA_KEY }}
-          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-          TF_VAR_region: ${{ secrets.GCP_REGION }}
+      - name: Build Docker image
         run: |
-          terraform plan -out=tfplan
+          docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/startup-news/${{ env.IMAGE_NAME }}:${{ github.sha }} .
+          docker tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/startup-news/${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/startup-news/${{ env.IMAGE_NAME }}:latest
 
-      - name: Terraform Apply
-        working-directory: ./infra/terraform
-        env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GCP_SA_KEY }}
-          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-          TF_VAR_region: ${{ secrets.GCP_REGION }}
+      - name: Push Docker image to Artifact Registry
         run: |
-          terraform apply -auto-approve tfplan
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/startup-news/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/startup-news/${{ env.IMAGE_NAME }}:latest
 
-      - name: Get deployment outputs
-        working-directory: ./infra/terraform
-        env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GCP_SA_KEY }}
+      - name: Deploy to Cloud Run
         run: |
-          terraform output -json > deployment-outputs.json || echo '{}' > deployment-outputs.json
-          cat deployment-outputs.json
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/startup-news/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --region=${{ env.REGION }} \
+            --platform=managed \
+            --allow-unauthenticated \
+            --set-env-vars="GCP_PROJECT_ID=${{ env.PROJECT_ID }},GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}"
 
-      - name: Upload deployment summary
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: deployment-summary
-          path: infra/terraform/deployment-outputs.json
-          if-no-files-found: ignore
+      - name: Get Cloud Run URL
+        run: |
+          gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format='value(status.url)'
