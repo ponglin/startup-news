@@ -184,7 +184,6 @@ def main(request):
     try:
         aggregator = NewsAggregator()
         result = aggregator.run()
-        return json.dumps(result), 200, {'Content-Type': 'application/json'}
-    except Exception as e:
-        logger.error(f"Function error: {str(e)}")
-        return json.dumps({'status': 'error', 'message': str(e)}), 500, {'Content-Type': 'application/json'}
+        return json.dumps(result)
+    except Exception as e:        logger.error(f"Function error: {str(e)}")
+return json.dumps({'status': 'error', 'message': str(e)})
