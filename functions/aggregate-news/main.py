@@ -178,12 +178,27 @@ class NewsAggregator:
         }
 
 
-@functions_framework.http
-def main(request):
-    """HTTP Cloud Function to aggregate startup news."""
+
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+@app.route('/aggregate', methods=['GET', 'POST'])
+def aggregate():
+    """HTTP endpoint to aggregate startup news."""
     try:
         aggregator = NewsAggregator()
         result = aggregator.run()
-        return json.dumps(result)
-    except Exception as e:        logger.error(f"Function error: {str(e)}")
-return json.dumps({'status': 'error', 'message': str(e)})
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Function error: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Health check endpoint for Cloud Run."""
+    return jsonify({'status': 'healthy'}), 200
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port, debug=False)
