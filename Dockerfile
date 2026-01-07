@@ -13,7 +13,6 @@ COPY functions/aggregate-news /app
 
 # Cloud Run expects PORT env var
 ENV PORT=8080
-ENV FUNCTION_TARGET=main
 
-# Start HTTP server with Google Functions Framework
-CMD exec functions-framework --target=main --port=${PORT}
+# Run Flask application directly
+CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=8080"]
