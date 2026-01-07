@@ -15,4 +15,4 @@ COPY functions/aggregate-news /app
 ENV PORT=8080
 
 # Run Flask application directly
-CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=8080"]
+CMD ["python", "main.py"]
