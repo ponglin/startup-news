@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any
 import functions_framework
 from google.cloud import firestore
-from google.cloud import storage
 import google.generativeai as genai
 import requests
 from bs4 import BeautifulSoup
